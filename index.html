@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Klassenspinner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Sitzordnung fuer die Woche</p>
+        <h1>Klassenspinner</h1>
+      </div>
+      <div class="header-actions">
+        <button id="exportButton" type="button">Speichern als Datei</button>
+        <label class="file-button">
+          Datei laden
+          <input id="importFile" type="file" accept="application/json,.json" />
+        </label>
+        <button id="spinButton" class="primary-button" type="button">Spinnt</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Einstellungen">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Kinder</h2>
+            <span id="seatCountLabel">0 Plaetze</span>
+          </div>
+          <form id="studentForm" class="inline-form">
+            <input id="studentName" type="text" placeholder="Name eingeben" autocomplete="off" />
+            <button type="submit">+</button>
+          </form>
+          <ul id="studentList" class="item-list"></ul>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Freunde</h2>
+            <span>Nicht nebeneinander</span>
+          </div>
+          <form id="friendForm" class="friend-form">
+            <select id="friendA"></select>
+            <select id="friendB"></select>
+            <button type="submit">Paar speichern</button>
+          </form>
+          <ul id="friendList" class="item-list"></ul>
+        </section>
+      </aside>
+
+      <section class="classroom-wrap" aria-label="Klassenraum">
+        <div class="toolbar">
+          <div>
+            <h2>Klassenraum</h2>
+            <p id="statusText">Lege Tische an und trage die Kinder ein.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="addTableButton" type="button">Tisch hinzufuegen</button>
+            <button id="addSingleButton" type="button">Einzelplatz</button>
+          </div>
+        </div>
+        <div id="classroom" class="classroom" aria-label="Tischplan"></div>
+      </section>
+
+      <aside class="sidebar right-sidebar" aria-label="Tisch bearbeiten">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Tisch</h2>
+            <span id="selectedTableLabel">Keiner ausgewaehlt</span>
+          </div>
+          <div id="tableEditor" class="table-editor is-disabled">
+            <label>
+              Name
+              <input id="tableName" type="text" />
+            </label>
+            <label>
+              Typ
+              <select id="tableType">
+                <option value="normal">Normaler Tisch</option>
+                <option value="single">Einzelplatz</option>
+              </select>
+            </label>
+            <label>
+              Sitzplaetze
+              <input id="tableSeats" type="number" min="1" max="12" />
+            </label>
+            <button id="rotateTableButton" type="button">Tisch drehen</button>
+            <button id="deleteTableButton" class="danger-button" type="button">Tisch loeschen</button>
+          </div>
+          <p class="hint">Tische kannst du im Plan mit der Maus verschieben.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Ergebnis</h2>
+          <ul id="resultList" class="result-list"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
