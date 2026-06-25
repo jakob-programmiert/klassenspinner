@@ -305,6 +305,12 @@ h2 {
   width: 122px;
 }
 
+.table.is-group .table-body {
+  align-content: start;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
 .table-name {
   font-weight: 800;
 }
@@ -362,10 +368,28 @@ h2 {
   transform: translateY(-50%);
 }
 
+.seat-row.is-group,
+.table[data-rotation="90"] .seat-row.is-group,
+.table[data-rotation="180"] .seat-row.is-group,
+.table[data-rotation="270"] .seat-row.is-group {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(46px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+  transform: none;
+}
+
 .seat-row .seat {
   position: static;
   flex: 0 0 auto;
   transform: none;
+}
+
+.seat-row.is-group .seat {
+  width: 100%;
+  min-height: 34px;
 }
 
 .seat.is-filled {
