@@ -17,6 +17,7 @@ const els = {
   exportButton: document.querySelector("#exportButton"),
   importFile: document.querySelector("#importFile"),
   addTableButton: document.querySelector("#addTableButton"),
+  addGroupButton: document.querySelector("#addGroupButton"),
   addSingleButton: document.querySelector("#addSingleButton"),
   studentForm: document.querySelector("#studentForm"),
   studentName: document.querySelector("#studentName"),
@@ -90,15 +91,18 @@ function importPortableState(fileData) {
 
   const tables = importedState.tables
     .filter((table) => typeof table?.id === "string")
-    .map((table, index) => ({
-      id: table.id,
-      name: typeof table.name === "string" && cleanName(table.name) ? cleanName(table.name) : `Tisch ${index + 1}`,
-      type: table.type === "single" ? "single" : "normal",
-      seats: table.type === "single" ? 1 : clamp(Number(table.seats) || 1, 1, 12),
-      rotation: normalizeRotation(table.rotation),
-      x: clamp(Number(table.x) || 40, 0, 4000),
-      y: clamp(Number(table.y) || 40, 0, 4000),
-    }));
+    .map((table, index) => {
+      const type = normalizeTableType(table.type);
+      return {
+        id: table.id,
+        name: typeof table.name === "string" && cleanName(table.name) ? cleanName(table.name) : `Tisch ${index + 1}`,
+        type,
+        seats: normalizeSeatCount(type, table.seats),
+        rotation: normalizeRotation(table.rotation),
+        x: clamp(Number(table.x) || 40, 0, 4000),
+        y: clamp(Number(table.y) || 40, 0, 4000),
+      };
+    });
 
   const studentIds = new Set(students.map((student) => student.id));
   const tableIds = new Set(tables.map((table) => table.id));
@@ -166,8 +170,8 @@ function normalizeState() {
   const seatIds = new Set(getSeats().map((seat) => seat.id));
 
   state.tables.forEach((table) => {
-    table.type = table.type === "single" ? "single" : "normal";
-    table.seats = table.type === "single" ? 1 : clamp(Number(table.seats) || 1, 1, 12);
+    table.type = normalizeTableType(table.type);
+    table.seats = normalizeSeatCount(table.type, table.seats);
     table.rotation = normalizeRotation(table.rotation);
   });
 
@@ -276,7 +280,7 @@ function renderClassroom() {
 
   state.tables.forEach((table) => {
     const tableEl = document.createElement("div");
-    tableEl.className = `table ${table.type === "single" ? "is-single" : "is-normal"}${table.id === state.selectedTableId ? " is-selected" : ""}`;
+    tableEl.className = `table is-${table.type}${table.id === state.selectedTableId ? " is-selected" : ""}`;
     const tableSize = getTableSize(table);
     tableEl.style.width = `${tableSize.width}px`;
     tableEl.style.minHeight = `${tableSize.height}px`;
@@ -287,12 +291,11 @@ function renderClassroom() {
 
     const body = document.createElement("div");
     body.className = "table-body";
-    const typeLabel = table.type === "single" ? "Einzelplatz" : `${table.seats} Plaetze`;
+    const typeLabel = getTableTypeLabel(table);
     body.innerHTML = `<div><div class="table-name">${escapeHtml(table.name)}</div><div class="table-meta">${escapeHtml(typeLabel)}</div></div>`;
-    tableEl.append(body);
 
     const seatRow = document.createElement("div");
-    seatRow.className = "seat-row";
+    seatRow.className = `seat-row${table.type === "group" ? " is-group" : ""}`;
     Array.from({ length: table.seats }).forEach((_, index) => {
       const seat = document.createElement("div");
       const seatId = `${table.id}:${index}`;
@@ -301,7 +304,12 @@ function renderClassroom() {
       seat.textContent = studentName || `${index + 1}`;
       seatRow.append(seat);
     });
-    tableEl.append(seatRow);
+    if (table.type === "group") {
+      body.append(seatRow);
+      tableEl.append(body);
+    } else {
+      tableEl.append(body, seatRow);
+    }
 
     tableEl.addEventListener("pointerdown", startDrag);
     tableEl.addEventListener("click", () => {
@@ -321,7 +329,9 @@ function renderTableEditor() {
   els.tableType.value = table?.type || "normal";
   els.tableSeats.value = table?.seats || "";
   els.tableSeats.disabled = table?.type === "single";
-  els.rotateTableButton.textContent = table ? `Tisch drehen (${table.rotation} Grad)` : "Tisch drehen";
+  els.rotateTableButton.disabled = !table || table.type === "group";
+  els.rotateTableButton.textContent =
+    table?.type === "group" ? "Gruppentisch bleibt kompakt" : table ? `Tisch drehen (${table.rotation} Grad)` : "Tisch drehen";
 }
 
 function renderResults() {
@@ -428,7 +438,7 @@ function spin() {
   render();
 
   if (bestViolations === 0) {
-    renderStatus("Neue Sitzordnung fertig. Keine Freunde sitzen direkt nebeneinander.");
+    renderStatus("Neue Sitzordnung fertig. Keine Freundesregel wurde verletzt.");
   } else {
     renderStatus(`<span class="warning">Beste gefundene Sitzordnung: ${bestViolations} Freundesregel${bestViolations === 1 ? "" : "n"} verletzt.</span>`);
   }
@@ -480,6 +490,11 @@ function countViolations(assignment) {
     const table = state.tables.find((item) => item.id === seatA.tableId);
     if (!table) return;
 
+    if (table.type === "group") {
+      violations += 1;
+      return;
+    }
+
     const distance = Math.abs(seatA.index - seatB.index);
     if (table.type !== "single" && distance === 1) {
       violations += 1;
@@ -513,12 +528,37 @@ function getTableSize(table) {
     return { width: 122, height: 94 };
   }
 
+  if (table.type === "group") {
+    const columns = Math.min(4, Math.ceil(Math.sqrt(table.seats)));
+    const rows = Math.ceil(table.seats / columns);
+    return {
+      width: Math.max(176, columns * 64),
+      height: Math.max(126, rows * 48 + 54),
+    };
+  }
+
   const longSide = Math.max(176, table.seats * 62);
   const isSideways = table.rotation === 90 || table.rotation === 270;
   return {
     width: isSideways ? 94 : longSide,
     height: isSideways ? longSide : 94,
   };
+}
+
+function normalizeTableType(value) {
+  return value === "single" || value === "group" ? value : "normal";
+}
+
+function normalizeSeatCount(type, value) {
+  if (type === "single") return 1;
+  const minimum = type === "group" ? 2 : 1;
+  return clamp(Number(value) || minimum, minimum, 12);
+}
+
+function getTableTypeLabel(table) {
+  if (table.type === "single") return "Einzelplatz";
+  if (table.type === "group") return `${table.seats}er Gruppentisch`;
+  return `${table.seats} Plaetze`;
 }
 
 function normalizeRotation(value) {
@@ -574,6 +614,22 @@ els.addTableButton.addEventListener("click", () => {
   render();
 });
 
+els.addGroupButton.addEventListener("click", () => {
+  const tableNumber = state.tables.length + 1;
+  const table = {
+    id: uid("table"),
+    name: `Gruppentisch ${tableNumber}`,
+    type: "group",
+    seats: 6,
+    rotation: 0,
+    x: 40 + ((tableNumber - 1) % 3) * 210,
+    y: 40 + Math.floor((tableNumber - 1) / 3) * 180,
+  };
+  state.tables.push(table);
+  state.selectedTableId = table.id;
+  render();
+});
+
 els.addSingleButton.addEventListener("click", () => {
   const tableNumber = state.tables.length + 1;
   const table = {
@@ -600,16 +656,18 @@ els.tableName.addEventListener("input", () => {
 els.tableSeats.addEventListener("change", () => {
   const table = getSelectedTable();
   if (!table) return;
-  table.seats = clamp(Number(els.tableSeats.value) || 1, 1, 12);
+  table.seats = normalizeSeatCount(table.type, els.tableSeats.value);
   render();
 });
 
 els.tableType.addEventListener("change", () => {
   const table = getSelectedTable();
   if (!table) return;
-  table.type = els.tableType.value === "single" ? "single" : "normal";
+  table.type = normalizeTableType(els.tableType.value);
   if (table.type === "single") {
     table.seats = 1;
+  } else if (table.type === "group" && table.seats < 2) {
+    table.seats = 6;
   } else if (table.seats < 2) {
     table.seats = 4;
   }
